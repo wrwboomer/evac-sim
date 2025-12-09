@@ -1,0 +1,147 @@
+{
+  "lopa": {
+    "name": "757-300 (234 Pax)",
+    "rows_total": 44,
+    "cross_aisle_row": 9,
+    "door_locations": [
+      {
+        "name": "L1",
+        "row": 0,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R1",
+        "row": 0,
+        "col": 6,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "L2",
+        "row": 9,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R2",
+        "row": 9,
+        "col": 6,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "L3",
+        "row": 25,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type III",
+        "active": true
+      },
+      {
+        "name": "R3",
+        "row": 25,
+        "col": 6,
+        "side": "right",
+        "exit_type": "Type III",
+        "active": true
+      },
+      {
+        "name": "L4",
+        "row": 35,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R4",
+        "row": 35,
+        "col": 6,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      }
+    ],
+    "sections": [
+      {
+        "class_name": "Forward Vestibule",
+        "start_row": 0,
+        "end_row": 0,
+        "layout_string": "...-...",
+        "seat_pitch_m": 1.5,
+        "note": "Entry area for Door L1"
+      },
+      {
+        "class_name": "First Class",
+        "start_row": 1,
+        "end_row": 3,
+        "layout_string": ".SS-SS.",
+        "seat_pitch_m": 1.5,
+        "note": "12 Seats (2-2)"
+      },
+      {
+        "class_name": "Economy Forward",
+        "start_row": 4,
+        "end_row": 8,
+        "layout_string": "SSS-SSS",
+        "seat_pitch_m": 0.81,
+        "note": "Zone A"
+      },
+      {
+        "class_name": "L2 Vestibule",
+        "start_row": 9,
+        "end_row": 9,
+        "layout_string": "...-...",
+        "seat_pitch_m": 1.5,
+        "note": "Main Entry Area (L2)"
+      },
+      {
+        "class_name": "Economy Mid-1",
+        "start_row": 10,
+        "end_row": 24,
+        "layout_string": "SSS-SSS",
+        "seat_pitch_m": 0.78,
+        "note": "Zone B"
+      },
+      {
+        "class_name": "Overwing Exit",
+        "start_row": 25,
+        "end_row": 25,
+        "layout_string": "...-...",
+        "seat_pitch_m": 1.0,
+        "note": "Exit Row Gap"
+      },
+      {
+        "class_name": "Economy Mid-2",
+        "start_row": 26,
+        "end_row": 34,
+        "layout_string": "SSS-SSS",
+        "seat_pitch_m": 0.78,
+        "note": "Zone C"
+      },
+      {
+        "class_name": "Aft Exit",
+        "start_row": 35,
+        "end_row": 35,
+        "layout_string": "...-...",
+        "seat_pitch_m": 1.0,
+        "note": "Exit Row Gap"
+      },
+      {
+        "class_name": "Economy Aft",
+        "start_row": 36,
+        "end_row": 43,
+        "layout_string": "SSS-SSS",
+        "seat_pitch_m": 0.78,
+        "note": "Zone D"
+      }
+    ]
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "lopa": {
+    "name": "767-300ER (248 Pax)",
+    "rows_total": 38,
+    "cross_aisle_row": 9,
+    "door_locations": [
+      {
+        "name": "L1",
+        "row": 0,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R1",
+        "row": 0,
+        "col": 8,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "L2",
+        "row": 9,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R2",
+        "row": 9,
+        "col": 8,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "L3",
+        "row": 37,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R3",
+        "row": 37,
+        "col": 8,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      }
+    ],
+    "sections": [
+      {
+        "class_name": "Forward Vestibule",
+        "start_row": 0,
+        "end_row": 0,
+        "layout_string": "---------",
+        "seat_pitch_m": 1.5,
+        "note": "Entry area for Door L1"
+      },
+      {
+        "class_name": "First Class",
+        "start_row": 1,
+        "end_row": 4,
+        "layout_string": "SS-S.S-SS",
+        "seat_pitch_m": 0.97,
+        "note": "2-2-2. The '.' pads the center to align with Eco 3-seat block."
+      },
+      {
+        "class_name": "Economy Mini-Cabin",
+        "start_row": 5,
+        "end_row": 8,
+        "layout_string": "SS-SSS-SS",
+        "seat_pitch_m": 0.86,
+        "note": "2-3-2 Configuration"
+      },
+      {
+        "class_name": "Mid-Ship Vestibule",
+        "start_row": 9,
+        "end_row": 9,
+        "layout_string": "---------",
+        "seat_pitch_m": 1.2,
+        "note": "Entry area for Door L2"
+      },
+      {
+        "class_name": "Economy Main",
+        "start_row": 10,
+        "end_row": 37,
+        "layout_string": "SS-SSS-SS",
+        "seat_pitch_m": 0.86,
+        "note": "Main Cabin"
+      }
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "lopa": {
+    "name": "Z4 (255 Pax) - 6 Exit Egress",
+    "rows_total": 20,
+    "cross_aisle_row": 8,
+    "door_locations": [
+      { "name": "L1", "row": 0, "col": 0, "side": "left", "exit_type": "Type A" },
+      { "name": "R1", "row": 0, "col": 26, "side": "right", "exit_type": "Type A" },
+      { "name": "L2", "row": 8, "col": 0, "side": "left", "exit_type": "Type A" },
+      { "name": "R2", "row": 8, "col": 26, "side": "right", "exit_type": "Type A" },
+      { "name": "L3", "row": 19, "col": 0, "side": "left", "exit_type": "Type A" },
+      { "name": "R3", "row": 19, "col": 26, "side": "right", "exit_type": "Type A" }
+    ],
+    "sections": [
+      {
+        "class_name": "Forward Vestibule",
+        "start_row": 0,
+        "end_row": 0,
+        "layout_string": "---------------------------",
+        "seat_pitch_m": 1.5,
+        "note": "Row 0: Forward Entry (27 chars)"
+      },
+      {
+        "class_name": "Split Nose (Biz Left / Eco Right)",
+        "start_row": 1,
+        "end_row": 7,
+        "layout_string": "..SS-SS.....|||...SSS-SS...",
+        "seat_pitch_m": 1.0,
+        "note": "Rows 1-7: Aligned to 27 chars"
+      },
+      {
+        "class_name": "Main Cross-Aisle",
+        "start_row": 8,
+        "end_row": 8,
+        "layout_string": "---------------------------",
+        "seat_pitch_m": 1.2,
+        "note": "Row 8: Mid Entry (27 chars)"
+      },
+      {
+        "class_name": "Main Body (Mixed Bays)",
+        "start_row": 9,
+        "end_row": 18,
+        "layout_string": "SSS-SSS|SS-SS|SS-SS|SSS-SSS",
+        "seat_pitch_m": 0.78,
+        "note": "Rows 9-18: Main Cabin (27 chars)"
+      },
+      {
+        "class_name": "Aft Cross-Aisle",
+        "start_row": 19,
+        "end_row": 19,
+        "layout_string": "---------------------------",
+        "seat_pitch_m": 1.2,
+        "note": "Row 19: Rear Egress Path (27 chars)"
+      }
+    ]
+  }
+}

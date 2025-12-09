@@ -1,0 +1,123 @@
+{
+  "lopa": {
+    "name": "787-8 (249 Pax)",
+    "rows_total": 32,
+    "cross_aisle_row": 5,
+    "door_locations": [
+      {
+        "name": "L1",
+        "row": 0,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R1",
+        "row": 0,
+        "col": 10,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "L2",
+        "row": 5,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R2",
+        "row": 5,
+        "col": 10,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "L3",
+        "row": 19,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R3",
+        "row": 19,
+        "col": 10,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "L4",
+        "row": 31,
+        "col": 0,
+        "side": "left",
+        "exit_type": "Type A",
+        "active": true
+      },
+      {
+        "name": "R4",
+        "row": 31,
+        "col": 10,
+        "side": "right",
+        "exit_type": "Type A",
+        "active": true
+      }
+    ],
+    "sections": [
+      {
+        "class_name": "Forward Vestibule",
+        "start_row": 0,
+        "end_row": 0,
+        "layout_string": "...-...-...",
+        "seat_pitch_m": 1.5,
+        "note": "Entry area for Door L1"
+      },
+      {
+        "class_name": "Business Class",
+        "start_row": 1,
+        "end_row": 4,
+        "layout_string": "S.S-S.S-S.S",
+        "seat_pitch_m": 2.1,
+        "note": "24 Seats (2-2-2) with gaps for width alignment"
+      },
+      {
+        "class_name": "L2 Door / Cross Aisle",
+        "start_row": 5,
+        "end_row": 5,
+        "layout_string": "...-...-...",
+        "seat_pitch_m": 1.5,
+        "note": "Main Entry Door L2"
+      },
+      {
+        "class_name": "Economy Forward",
+        "start_row": 6,
+        "end_row": 18,
+        "layout_string": "SSS-SSS-SSS",
+        "seat_pitch_m": 0.81,
+        "note": "Zone B (3-3-3)"
+      },
+      {
+        "class_name": "Mid-Exit / Lavs",
+        "start_row": 19,
+        "end_row": 19,
+        "layout_string": "...-...-...",
+        "seat_pitch_m": 1.2,
+        "note": "Emergency Exit Gap"
+      },
+      {
+        "class_name": "Economy Aft",
+        "start_row": 20,
+        "end_row": 31,
+        "layout_string": "SSS-SSS-SSS",
+        "seat_pitch_m": 0.81,
+        "note": "Zone C (3-3-3)"
+      }
+    ]
+  }
+}

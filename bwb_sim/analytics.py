@@ -10,6 +10,7 @@ import numpy as np
 import datetime
 import sys
 from .engine import Simulation
+from .reports import get_assumptions_string
 
 class AnalyticsDashboard(ttk.Frame):
     def __init__(self, parent, controller, config, baseline_data=None, baseline_name=None):
@@ -275,15 +276,11 @@ class AnalyticsDashboard(ttk.Frame):
         lines.append("")
         lines.append(f"Layout:           {self.config.lopa.name}")
         lines.append(f"Strategy:         {self.config.strategy}")
-        if getattr(self.config, "mode", "egress") == "egress":
-            active = [d.name for d in self.config.lopa.door_locations if self.config.behavior.active_exits.get(d.name, d.active)]
-            blocked = [d.name for d in self.config.lopa.door_locations if not self.config.behavior.active_exits.get(d.name, d.active)]
-            lines.append(f"Active Exits:     {', '.join(active) if active else 'None'}")
-            lines.append(f"Blocked Exits:    {', '.join(blocked) if blocked else 'None'}")
-        else:
-            lines.append(f"Doors Used:       {self.config.primary_door}")
         lines.append(f"Total Trials:     {len(self.results_times)}")
         lines.append("")
+        
+        # User Assumptions (Mix, Physics, Exits)
+        lines.append(get_assumptions_string(self.config))
         lines.append("--- BATCH STATISTICS ---")
         lines.append(f"Trials:           {len(self.results_times)}")
         lines.append(f"Average Time:     {avg:.2f} sec")

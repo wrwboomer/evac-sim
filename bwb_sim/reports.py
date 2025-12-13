@@ -6,6 +6,42 @@ from collections import defaultdict
 def _time_str(seconds: float) -> str:
     return f"{seconds:.1f} sec"
 
+def get_assumptions_string(cfg):
+    """Generates a formatted string of the user's configuration assumptions."""
+    lines = []
+    lines.append("--- USER ASSUMPTIONS ---")
+    
+    # 1. Passenger Mix (Inputs)
+    mix = cfg.pax_mix
+    lines.append("Passenger Mix:")
+    lines.append(f"  - Business:     {mix.business_pct}%")
+    lines.append(f"  - Families:     {mix.family_pct}%")
+    lines.append(f"  - PRM:          {mix.prm_pct}%")
+    lines.append(f"  - Economy:      {100 - mix.business_pct - mix.family_pct - mix.prm_pct}% (Derived)")
+    
+    # 2. Demographics (Inputs)
+    lines.append("Demographics Targets:")
+    lines.append(f"  - Female:       {mix.female_pct}%")
+    lines.append(f"  - Over 50:      {mix.over_50_pct}%")
+    lines.append(f"  - Infants:      {mix.simulated_infants}")
+    
+    # 3. Physics / Behavior
+    beh = cfg.behavior
+    lines.append("Behavior / Physics:")
+    lines.append(f"  - Avg Walk Speed: {beh.speed_mps_mean} m/s")
+    lines.append(f"  - Reaction Time:  {beh.reaction_time_mean} sec")
+    lines.append(f"  - Panic Level:    {beh.panic_level}")
+    lines.append(f"  - Slide Delay:    {beh.slide_delay_sec} sec")
+    
+    if cfg.mode == "egress":
+        active = [d.name for d in cfg.lopa.door_locations if beh.active_exits.get(d.name, d.active)]
+        blocked = [d.name for d in cfg.lopa.door_locations if not beh.active_exits.get(d.name, d.active)]
+        lines.append(f"Active Exits:       {', '.join(active) if active else 'None'}")
+        lines.append(f"Blocked Exits:      {', '.join(blocked) if blocked else 'None'}")
+        
+    lines.append("")
+    return "\n".join(lines)
+
 def get_report_string(sim):
     """Generates the text content of the simulation report."""
     cfg = sim.cfg
@@ -21,6 +57,9 @@ def get_report_string(sim):
     lines.append(f"Aircraft:         {cfg.lopa.name}")
     lines.append(f"Load Factor:      {cfg.load_factor * 100:.0f}%")
     lines.append("")
+    
+    # Add User Assumptions
+    lines.append(get_assumptions_string(cfg))
 
     if cfg.mode != "egress":
         # Boarding report (legacy)
@@ -34,15 +73,7 @@ def get_report_string(sim):
         lines.append(f"Passengers:       {seated_pax} / {total_pax}")
         lines.append(f"Completion:       {(seated_pax/total_pax)*100:.1f}%")
         lines.append("")
-        lines.append("--- CONFIGURATION ASSUMPTIONS ---")
-        lines.append(f"Boarding Door:    {cfg.primary_door}")
-        lines.append(f"Strategy:         {cfg.strategy}")
-        lines.append("")
-        lines.append("--- BEHAVIOR SETTINGS ---")
-        lines.append(f"Avg Walk Speed:   {cfg.behavior.speed_mps_mean} m/s")
-        lines.append(f"Avg Stow Time:    {cfg.behavior.stow_time_mean} sec")
-        lines.append(f"Seat Shuffle:     {cfg.behavior.seat_shuffle_sec} sec")
-        lines.append("")
+        # (Legacy explicit blocks removed ensuring no duplication)
         lines.append("--- DOOR SETTINGS ---")
         lines.append(f"L1 Entry Rate:    {cfg.behavior.arrival_rate_l1} sec/pax")
         lines.append(f"L2 Entry Rate:    {cfg.behavior.arrival_rate_l2} sec/pax")

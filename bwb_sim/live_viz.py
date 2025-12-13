@@ -275,10 +275,10 @@ class LiveSimulationFrame(ttk.Frame):
         over50_pct = (over50_cnt / total_pax) * 100
 
         legend_patches = [
-            mpatches.Patch(color='#9c27b0', label=f"Female & >50: {self.get_demo_count('both')}"),
-            mpatches.Patch(color='#e91e63', label=f"Female Only: {self.get_demo_count('female')}"),
-            mpatches.Patch(color='#f39c12', label=f"Over 50 Only: {self.get_demo_count('over50')}"),
-            mpatches.Patch(color='#007acc', label="Other"),
+            mpatches.Patch(color='#9c27b0', label=f"Female > 50: {self.get_demo_count('both')}"),
+            mpatches.Patch(color='#e91e63', label=f"Female < 50: {self.get_demo_count('female')}"),
+            mpatches.Patch(color='#f39c12', label=f"Male > 50:   {self.get_demo_count('over50')}"),
+            mpatches.Patch(color='#007acc', label="Male < 50"),
             mpatches.Patch(color='#666666', alpha=0.0, label=f"Infants: {infants_cnt}")
         ]
         self.ax.legend(handles=legend_patches, loc='upper left', bbox_to_anchor=(1.02, 1.0), ncol=1, fontsize=9, frameon=False)
@@ -335,6 +335,7 @@ class LiveSimulationFrame(ttk.Frame):
                 color = '#9c27b0' # Purple (Overlap)
             elif is_o50:
                 color = '#f39c12' # Orange
+            elif is_fem:
                 color = '#e91e63' # Pink
             else:
                 color = '#007acc' # Blue

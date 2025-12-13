@@ -62,6 +62,29 @@ def get_report_string(sim):
     lines.append(f"Evacuated:        {evacuated} / {total_pax}")
     lines.append(f"FAA 90s Pass:     {'YES' if faa_pass_90 else 'NO'}")
     lines.append("")
+    
+    # --- FAA CERTIFICATION CHECK ---
+    # Calculate Metrics
+    cnt_female = sum(1 for p in sim.passengers if getattr(p, "is_female", False))
+    cnt_over50 = sum(1 for p in sim.passengers if getattr(p, "is_over_50", False))
+    cnt_both = sum(1 for p in sim.passengers if getattr(p, "is_female", False) and getattr(p, "is_over_50", False))
+    cnt_infants = sim.cfg.pax_mix.simulated_infants
+    
+    pct_female = (cnt_female / total_pax) * 100 if total_pax else 0
+    pct_over50 = (cnt_over50 / total_pax) * 100 if total_pax else 0
+    pct_both = (cnt_both / total_pax) * 100 if total_pax else 0
+    
+    lines.append("--- FAA APPENDIX J CERTIFICATION CHECK ---")
+    lines.append(f"1. Total Count:   {total_pax}")
+    lines.append(f"2. Female >= 40%:  {pct_female:.1f}%  [{'PASS' if pct_female >= 39.9 else 'FAIL'}]")
+    lines.append(f"3. Over 50 >= 35%: {pct_over50:.1f}%  [{'PASS' if pct_over50 >= 34.9 else 'FAIL'}]")
+    lines.append(f"4. Overlap >= 15%: {pct_both:.1f}%  [{'PASS' if pct_both >= 14.9 else 'FAIL'}]") # 14.9 tolerance for rounding
+    lines.append(f"5. Infants >= 3:   {cnt_infants}      [{'PASS' if cnt_infants >= 3 else 'FAIL'}]")
+    lines.append(f"6. Time <= 90s:    {duration:.1f}s   [{'PASS' if duration <= 90.0 else 'FAIL'}]")
+    
+    all_passed = (pct_female >= 39.9 and pct_over50 >= 34.9 and pct_both >= 14.9 and cnt_infants >= 3 and duration <= 90.0)
+    lines.append(f"OVERALL STATUS:   {'[ CERTIFIED ]' if all_passed else '[ FAILED ]'}")
+    lines.append("")
 
     # Door stats
     door_times = defaultdict(list)

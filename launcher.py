@@ -149,9 +149,10 @@ class ConfigPage(ttk.Frame):
         # Female AND Over 50 calculated indicator
         self.overlap_frame = ttk.Frame(demo_frame)
         self.overlap_frame.pack(fill=X, pady=5)
-        self.overlap_lbl = ttk.Label(self.overlap_frame, text="Female + Over 50 Overlap: 15%", width=35)
+        # Note: Simulation Engine now FORCES 15% overlap if female% and over50% allow it.
+        self.overlap_lbl = ttk.Label(self.overlap_frame, text="Female + Over 50 (Req ≥15%):", width=35)
         self.overlap_lbl.pack(side=LEFT)
-        self.overlap_status = ttk.Label(self.overlap_frame, text="✓ PASS (≥15%)", foreground="green", font=("Helvetica", 9, "bold"))
+        self.overlap_status = ttk.Label(self.overlap_frame, text="✓ ENFORCED", foreground="green", font=("Helvetica", 9, "bold"))
         self.overlap_status.pack(side=RIGHT)
         
         # Simulated Infants
@@ -162,6 +163,15 @@ class ConfigPage(ttk.Frame):
         ttk.Spinbox(infant_row, from_=0, to=10, textvariable=self.var_simulated_infants, width=5).pack(side=LEFT)
         ttk.Label(infant_row, text="  FAA requires 3", foreground="gray").pack(side=LEFT)
         
+        
+        # --- SECTION 5B: PASSENGER MIX ---
+        mix_frame = ttk.Labelframe(self, text="Passenger Mix (%)", padding=10, bootstyle="info")
+        mix_frame.pack(fill=X, pady=5)
+        
+        self.add_manual_slider(mix_frame, "Business %", "business_pct", 0, 100, is_mix=True)
+        self.add_manual_slider(mix_frame, "Families %", "family_pct", 0, 100, is_mix=True)
+        self.add_manual_slider(mix_frame, "PRM %", "prm_pct", 0, 100, is_mix=True)
+
         # --- SECTION 6: PHYSICS ---
         beh_frame = ttk.Labelframe(self, text="Physics", padding=10, bootstyle="secondary")
         beh_frame.pack(fill=X, pady=5)
@@ -269,29 +279,19 @@ class ConfigPage(ttk.Frame):
         scale.pack(side=LEFT, fill=X, expand=True, padx=5)
 
     def update_overlap_indicator(self):
-        """Calculate and display Female + Over 50 overlap based on statistical overlap."""
+        """Update overlap indicator text."""
+        # Logic is now enforced in engine.py to 15% overlap
+        # Check if user settings assume impossibility of 15% overlap (e.g. Total Female < 15%)
         female_pct = getattr(self, "var_female_pct", tk.DoubleVar(value=40)).get()
         over_50_pct = getattr(self, "var_over_50_pct", tk.DoubleVar(value=35)).get()
         
-        # Statistical overlap: P(A and B) ≈ P(A) * P(B) for independent events
-        # But FAA requires at least 15% of passengers to be BOTH female AND over 50
-        # Conservative estimate: minimum of the two percentages, capped by the smaller group
-        overlap = min(female_pct, over_50_pct) * min(female_pct, over_50_pct) / 100
-        # A simpler model: assume 50% of over-50s are female (realistic demographic)
-        overlap = min(female_pct, over_50_pct * 0.5 + female_pct * 0.5 * over_50_pct / 100)
-        overlap = min(female_pct, over_50_pct)  # Simplified: overlap can't exceed either percentage
+        possible = (female_pct >= 15) and (over_50_pct >= 15)
         
-        # For FAA compliance, we show the expected overlap percentage
-        # Overlap = (female% / 100) * over_50% represents females who are also over 50
-        overlap = (female_pct / 100) * over_50_pct
-        
-        if hasattr(self, 'overlap_lbl'):
-            self.overlap_lbl.config(text=f"Female + Over 50 Overlap: {overlap:.1f}%")
         if hasattr(self, 'overlap_status'):
-            if overlap >= 15:
-                self.overlap_status.config(text="✓ PASS (≥15%)", foreground="green")
-            else:
-                self.overlap_status.config(text="✗ FAIL (≥15%)", foreground="red")
+             if possible:
+                 self.overlap_status.config(text="✓ ENORCED (≥15%)", foreground="green")
+             else:
+                 self.overlap_status.config(text="✗ IMPOSSIBLE", foreground="red")
 
     def get_current_config(self):
         cfg = self.base_config 
@@ -326,6 +326,14 @@ class ConfigPage(ttk.Frame):
         cfg.pax_mix.female_pct = int(getattr(self, "var_female_pct").get())
         cfg.pax_mix.over_50_pct = int(getattr(self, "var_over_50_pct").get())
         cfg.pax_mix.simulated_infants = int(getattr(self, "var_simulated_infants").get())
+
+        
+        # Helper to safely get mix vars if they exist (handling potential race conditions with mix widgets)
+        if hasattr(self, "var_business_pct"):
+            cfg.pax_mix.business_pct = getattr(self, "var_business_pct").get()
+            cfg.pax_mix.family_pct = getattr(self, "var_family_pct").get()
+            cfg.pax_mix.prm_pct = getattr(self, "var_prm_pct").get()
+
         cfg.load_factor = getattr(self, "var_load_factor").get() / 100.0
         return cfg
 

@@ -131,16 +131,18 @@ class Simulation:
             
         total = len(seats)
         mix = self.cfg.pax_mix
+        import math
         
         # FAA Demographics - assign to passengers (female / over_50 quotas)
-        n_female = int(total * (mix.female_pct / 100))
-        n_over_50 = int(total * (mix.over_50_pct / 100))
+        # Use CEIL to ensure we meet "At Least" requirements
+        n_female = math.ceil(total * (mix.female_pct / 100.0))
+        n_over_50 = math.ceil(total * (mix.over_50_pct / 100.0))
         
-        # Behavioral types (unchanged percentages)
-        n_prm = max(1, int(total * 0.02))  # 2% wheelchair/PRM
-        n_family = max(1, int(total * 0.10))  # 10% families
-        n_bus = max(1, int(total * 0.15))  # 15% business
-        n_eco = total - n_bus - n_family - n_prm
+        # Behavioral types (Configurable percentages)
+        n_prm = math.ceil(total * (mix.prm_pct / 100.0))
+        n_family = math.ceil(total * (mix.family_pct / 100.0))
+        n_bus = math.ceil(total * (mix.business_pct / 100.0))
+        n_eco = max(0, total - n_bus - n_family - n_prm)
         
         pax_list = []
         
@@ -190,11 +192,53 @@ class Simulation:
             pax_list = random.sample(pax_list, count)
 
         # Apply demographic flags and speed adjustments
+        # We need to ensure:
+        # 1. At least 40% Female
+        # 2. At least 35% Over 50
+        # 3. At least 15% are BOTH Female AND Over 50 (Overlap)
+        
+        n_both = math.ceil(total * 0.15) # 15% intersection (Ceil for "At Least")
+        
+        # Sanity check: Intersection cannot exceed total groups
+        n_both = min(n_both, n_female, n_over_50)
+        
+        n_female_only = max(0, n_female - n_both)
+        n_over50_only = max(0, n_over_50 - n_both)
+        
+        # Ensure we don't exceed total passengers (basic check)
+        if (n_both + n_female_only + n_over50_only) > len(pax_list):
+             # Fallback if numbers are impossible (e.g. very small total)
+             n_both = min(n_both, len(pax_list))
+             remaining = len(pax_list) - n_both
+             n_female_only = min(n_female_only, remaining)
+             remaining -= n_female_only
+             n_over50_only = min(n_over50_only, remaining)
+        
         random.shuffle(pax_list)
-        for p in pax_list[:n_female]:
-            p.is_female = True
-        for p in pax_list[n_female:n_female + n_over_50]:
-            p.is_over_50 = True
+        idx = 0
+        
+        # Assign Intersection (Female AND Over 50)
+        for i in range(n_both):
+            if idx >= len(pax_list): break
+            pax_list[idx].is_female = True
+            pax_list[idx].is_over_50 = True
+            idx += 1
+            
+        # Assign Female Only
+        for i in range(n_female_only):
+            if idx >= len(pax_list): break
+            pax_list[idx].is_female = True
+            pax_list[idx].is_over_50 = False
+            idx += 1
+            
+        # Assign Over 50 Only
+        for i in range(n_over50_only):
+            if idx >= len(pax_list): break
+            pax_list[idx].is_female = False
+            pax_list[idx].is_over_50 = True
+            idx += 1
+            
+        # Remainder: Male and Under 50 (Implicitly False/False)
 
         for p in pax_list:
             # Over 50: slower

@@ -262,6 +262,10 @@ class LiveSimulationFrame(ttk.Frame):
                         self.ax.add_patch(rect)
             self.canvas.draw()
             return
+        
+
+
+
 
         total_pax = len(self.sim.passengers) if self.sim.passengers else 1
         female_cnt = sum(1 for p in self.sim.passengers if getattr(p, "is_female", False))
@@ -271,10 +275,11 @@ class LiveSimulationFrame(ttk.Frame):
         over50_pct = (over50_cnt / total_pax) * 100
 
         legend_patches = [
-            mpatches.Patch(color='#e91e63', label=f"Female: {female_cnt} ({female_pct:.0f}%)"),
-            mpatches.Patch(color='#f39c12', label=f"Over 50: {over50_cnt} ({over50_pct:.0f}%)"),
+            mpatches.Patch(color='#9c27b0', label=f"Female & >50: {self.get_demo_count('both')}"),
+            mpatches.Patch(color='#e91e63', label=f"Female Only: {self.get_demo_count('female')}"),
+            mpatches.Patch(color='#f39c12', label=f"Over 50 Only: {self.get_demo_count('over50')}"),
             mpatches.Patch(color='#007acc', label="Other"),
-            mpatches.Patch(color='#666666', alpha=0.0, label=f"Infants (dolls): {infants_cnt}")
+            mpatches.Patch(color='#666666', alpha=0.0, label=f"Infants: {infants_cnt}")
         ]
         self.ax.legend(handles=legend_patches, loc='upper left', bbox_to_anchor=(1.02, 1.0), ncol=1, fontsize=9, frameon=False)
 
@@ -322,17 +327,32 @@ class LiveSimulationFrame(ttk.Frame):
                 self.ax.text(px, py - 0.6, door.name, fontsize=8, ha='center', va='bottom', color='#333333', zorder=21)
 
         for p in active:
-            # Demographic-based coloring: prioritize over_50, then female, else other
-            if getattr(p, "is_over_50", False):
-                color = '#f39c12'
-            elif getattr(p, "is_female", False):
-                color = '#e91e63'
+            # Demographic-based coloring
+            is_fem = getattr(p, "is_female", False)
+            is_o50 = getattr(p, "is_over_50", False)
+            
+            if is_fem and is_o50:
+                color = '#9c27b0' # Purple (Overlap)
+            elif is_o50:
+                color = '#f39c12' # Orange
+                color = '#e91e63' # Pink
             else:
-                color = '#007acc'
+                color = '#007acc' # Blue
             px, py = self.get_phys_coords(p.curr_r, p.curr_c)
             self.ax.plot(px, py, 'o', color=color, ms=6, markeredgecolor='white', zorder=10)
 
         self.canvas.draw()
+
+    def get_demo_count(self, mode):
+        # Helper for counting disjoint groups for visualization
+        cnt = 0
+        for p in self.sim.passengers:
+            is_fem = getattr(p, "is_female", False)
+            is_o50 = getattr(p, "is_over_50", False)
+            if mode == 'both' and is_fem and is_o50: cnt += 1
+            elif mode == 'female' and is_fem and not is_o50: cnt += 1
+            elif mode == 'over50' and not is_fem and is_o50: cnt += 1
+        return cnt
 
     def format_time(self):
         mins = int(self.current_time // 60)

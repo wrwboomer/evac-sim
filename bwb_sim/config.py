@@ -29,6 +29,11 @@ class PassengerMix(BaseModel):
     female_pct: int = 40      # FAA requires >= 40%
     over_50_pct: int = 35     # FAA requires >= 35%
     simulated_infants: int = 3  # FAA requires 3 dolls carried by passengers
+    
+    # Custom Mix
+    business_pct: float = 15.0
+    family_pct: float = 15.0
+    prm_pct: float = 2.0
 
 class Behavior(BaseModel):
     # --- BOARDING SPEEDS (Granular) ---

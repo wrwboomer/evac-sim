@@ -21,6 +21,7 @@ class Simulation:
         self.all_evacuated_event = self.env.event()
         self.door_queues = {}
         self.door_resources = {}  # Serialized door access (FIFO, capacity=1)
+        self.exit_records = []    # [{'door': name, 't_exit': time, 'p_type': str}]
     
     def _validate_position(self, r, c, passenger_id=None):
         """Validate that a position is not a wall (including galley). Raises error if invalid."""
@@ -95,8 +96,8 @@ class Simulation:
             self.door_maps[d.name] = self.geo.compute_distance_map([(d.row, d.col)])
 
         self.env.process(self.evacuation_control(active_doors))
-        # FAA LIMIT: 90 Seconds
-        self.env.run(until=simpy.AnyOf(self.env, [self.all_evacuated_event, self.env.timeout(90)]))
+        # Run until everyone evacuates (no hard 90s cap; use long safety cap to avoid infinite hang)
+        self.env.run(until=simpy.AnyOf(self.env, [self.all_evacuated_event, self.env.timeout(3600)]))
         
         if self.pbar: self.pbar.close()
         return self.get_stats()
@@ -104,11 +105,14 @@ class Simulation:
     def get_stats(self):
         if self.cfg.mode == "egress":
             evacuated_count = len([p for p in self.passengers if p.curr_r == -999])
+            total_pax = len(self.passengers)
+            total_time = self.env.now
             return {
-                "total_time": self.env.now,
+                "total_time": total_time,
                 "evacuated_count": evacuated_count,
-                "total_pax": len(self.passengers),
-                "success": (evacuated_count == len(self.passengers))
+                "total_pax": total_pax,
+                "success": (evacuated_count == total_pax),
+                "faa_pass_90s": (evacuated_count == total_pax and total_time <= 90.0)
             }
         else:
             seated_pax = [p for p in self.passengers if p.curr_r == -99]
@@ -128,10 +132,15 @@ class Simulation:
         total = len(seats)
         mix = self.cfg.pax_mix
         
-        n_bus = int(total * (mix.business_pct / 100))
-        n_fam = int(total * (mix.family_pct / 100))
-        n_prm = int(total * (mix.prm_pct / 100))
-        n_eco = total - n_bus - n_fam - n_prm
+        # FAA Demographics - assign to passengers (female / over_50 quotas)
+        n_female = int(total * (mix.female_pct / 100))
+        n_over_50 = int(total * (mix.over_50_pct / 100))
+        
+        # Behavioral types (unchanged percentages)
+        n_prm = max(1, int(total * 0.02))  # 2% wheelchair/PRM
+        n_family = max(1, int(total * 0.10))  # 10% families
+        n_bus = max(1, int(total * 0.15))  # 15% business
+        n_eco = total - n_bus - n_family - n_prm
         
         pax_list = []
         
@@ -180,6 +189,20 @@ class Simulation:
             count = int(len(pax_list) * self.cfg.load_factor)
             pax_list = random.sample(pax_list, count)
 
+        # Apply demographic flags and speed adjustments
+        random.shuffle(pax_list)
+        for p in pax_list[:n_female]:
+            p.is_female = True
+        for p in pax_list[n_female:n_female + n_over_50]:
+            p.is_over_50 = True
+
+        for p in pax_list:
+            # Over 50: slower
+            if getattr(p, "is_over_50", False):
+                p.speed = max(0.2, p.speed * 0.8)
+            # Female: keep as-is (could tweak if needed)
+            # PRM already handled via p_type
+
         self.passengers = pax_list
         strat = getattr(self.cfg, 'strategy', 'random')
         apply_strategy(self.passengers, strat, self.cfg.lopa.sections)
@@ -191,9 +214,8 @@ class Simulation:
             p.curr_c = p.col
             # Apply VISIBILITY factor
             vis = getattr(self.cfg.behavior, 'visibility_factor', 1.0)
-            # Use dedicated evacuation speed parameter instead of boarding speeds
-            base_evac_speed = self.cfg.behavior.evac_speed_mean  # Default 1.5 m/s
-            p.speed = max(0.5, base_evac_speed * vis)  # Apply visibility factor
+            # Apply visibility multiplier on top of per-passenger speed
+            p.speed = max(0.2, p.speed * vis)
 
     def evacuation_control(self, active_doors):
         for p in self.passengers:
@@ -258,66 +280,63 @@ class Simulation:
         dist_map = self.door_maps[target_door.name]
         print(f"Pax {p.id} ({p.p_type}) Target: {target_door.name} Dist: {dist_map.get((curr_r, curr_c), -1)}")
 
-        # 3. Getting Out of Seat (if blocked by aisle, simplified)
+        # 3. Getting Out of Seat (stepwise, respecting occupancy)
+        # Acquire current seat node first
+        current_reqs = yield from self.acquire_node(p, p.row, p.col)
+        p.curr_r, p.curr_c = p.row, p.col
+        curr_r, curr_c = p.row, p.col
+
         if p.col != p.aisle_col:
-            # yield self.env.timeout(random.uniform(1.0, 3.0)) 
-            # REALISTIC SEAT EGRESS: Check if blocked
             step = 1 if p.aisle_col > p.col else -1
             
             # 1. Reaction/Standup
             yield self.env.timeout(random.uniform(1.0, 2.0))
             
             # 2. Wait for neighbors to clear (with timeout to prevent infinite blocking)
-            # Scan from my seat to aisle
             blocked = True
             max_wait_time = 1.5  # tighter to avoid long stalls
             wait_elapsed = 0.0
             while blocked and wait_elapsed < max_wait_time:
                 blocked = False
-                # Check all seats between me and aisle (excluding myself AND the aisle itself)
                 for c_chk in range(p.col + step, p.aisle_col, step):
                     node = self.geo.get_node(p.row, c_chk)
                     if node.count >= 1: 
                         blocked = True
                         break
-                
                 if blocked:
                     wait_time = min(0.3, max_wait_time - wait_elapsed)
                     yield self.env.timeout(wait_time)
                     wait_elapsed += wait_time
             
-            # 3. Move Logic (Simplified Teleport to Aisle entry for now, as implemented previously)
-            # But add delay for "shuffle"
-            yield self.env.timeout(random.uniform(0.5, 1.0) * abs(p.col - p.aisle_col))
-        
-        curr_r, curr_c = p.row, p.aisle_col # Target aisle position
-        self._validate_position(curr_r, curr_c, p.id)
-        
-        # Try to enter the aisle WITH TIMEOUT to prevent indefinite blocking
-        # This fixes aisle-seat passengers getting stuck
-        current_reqs = None
-        aisle_entry_attempts = 0
-        while current_reqs is None:
-            aisle_entry_attempts += 1
-            aisle_node = self.geo.get_node(curr_r, curr_c)
-            req = aisle_node.request()
-            
-            # Use AnyOf with timeout to avoid blocking forever
-            timeout_event = self.env.timeout(0.5 + random.uniform(0, 0.3))
-            result = yield simpy.AnyOf(self.env, [req, timeout_event])
-            
-            if req.processed:
-                current_reqs = [req]
-                if p.width_units > 1:
-                    req2 = aisle_node.request()
-                    yield req2
-                    current_reqs.append(req2)
-            else:
-                # Timed out - cancel request and retry
-                req.cancel()
-                yield self.env.timeout(random.uniform(0.1, 0.3))
-        
-        p.curr_r, p.curr_c = curr_r, curr_c
+            # 3. Stepwise lateral move to aisle (with occupancy)
+            while curr_c != p.aisle_col:
+                next_c = curr_c + step
+                new_reqs, old_reqs = yield from self.move_step(
+                    p, curr_r, next_c, current_reqs, timeout=None  # hold position until move succeeds
+                )
+                if new_reqs is None:
+                    # Failed (should be rare with timeout=None); small backoff
+                    yield self.env.timeout(0.2)
+                    continue
+                current_reqs = new_reqs
+                curr_c = next_c
+                p.curr_r, p.curr_c = curr_r, curr_c
+        else:
+            # Already at aisle column; current_reqs holds seat. Move into aisle cell.
+            pass  # handled below
+
+        # Ensure we are holding the aisle cell (if we are not already in it, move one step)
+        if curr_c != p.aisle_col:
+            raise ValueError("Unexpected: failed to reach aisle column in seat egress.")
+        if curr_r != p.row or curr_c != p.aisle_col:
+            # Move into target aisle cell if not already there
+            new_reqs, old_reqs = yield from self.move_step(
+                p, p.row, p.aisle_col, current_reqs, timeout=None
+            )
+            if new_reqs is not None:
+                current_reqs = new_reqs
+                curr_r, curr_c = p.row, p.aisle_col
+                p.curr_r, p.curr_c = curr_r, curr_c
 
         # 4. Gradient Descent Movement with Re-Evaluation
         steps_since_eval = 0
@@ -334,10 +353,16 @@ class Simulation:
                 steps_since_eval = 999 # Force re-eval
                 if random.random() < 0.3: force_random_move = True # Try to wiggle out
             
+            def door_load(d):
+                res = self.door_resources.get(d.name)
+                if res is None:
+                    return 0
+                return res.count + len(res.queue)
+
             if steps_since_eval > 5:
                 steps_since_eval = 0
                 # Check Door Choice
-                current_target_score = self.door_queues.get(target_door.name, 0) + dist_map.get((curr_r, curr_c), 999)
+                current_target_score = door_load(target_door) + dist_map.get((curr_r, curr_c), 999)
                 
                 # Scan other ACTIVE doors
                 best_alt = target_door
@@ -349,7 +374,7 @@ class Simulation:
                     alt_dist = self.door_maps[alt_d.name].get((curr_r, curr_c), 9999)
                     if alt_dist > 500: continue # Unreachable
                     
-                    alt_score = self.door_queues.get(alt_d.name, 0) + alt_dist
+                    alt_score = door_load(alt_d) + alt_dist
                     
                     # Switch if SUBSTANTIALLY better (hysteresis to prevent flickering)
                     # If stuck, lower the bar for switching
@@ -457,8 +482,7 @@ class Simulation:
         with door_res.request() as door_req:
             yield door_req  # FIFO, capacity=1
 
-            self.door_queues[target_door.name] = self.door_queues.get(target_door.name, 0) + 1
-            q_size = self.door_queues[target_door.name]
+            q_size = door_res.count + len(door_res.queue)
             
             if target_door.exit_type == "Type A": base_delay = self.cfg.behavior.flow_rate_type_a
             elif target_door.exit_type == "Type III": base_delay = self.cfg.behavior.flow_rate_type_3
@@ -478,7 +502,15 @@ class Simulation:
             jam_factor = 1.0 + (self.cfg.behavior.panic_level * q_size * 0.02)
             yield self.env.timeout(base_delay * jam_factor)
             
-            self.door_queues[target_door.name] -= 1
+            # Record exit stats
+            p.t_exit = self.env.now
+            p.exit_door = target_door.name
+            self.exit_records.append({
+                'door': target_door.name,
+                't_exit': p.t_exit,
+                'p_type': p.p_type
+            })
+
 
         # 6. Escape
         for req in current_reqs: req.resource.release(req)

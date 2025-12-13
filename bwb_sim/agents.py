@@ -24,6 +24,12 @@ class Passenger:
     stow_time: float = 3.0
     width_units: int = 1    # 1 = Standard, 2 = Wide (PRM)
     
+    # Demographic flags (for speed adjustments)
+    is_female: bool = False
+    is_over_50: bool = False
+    
     # Metrics
     t_enter: float = 0.0
     t_seated: float = 0.0
+    t_exit: float = 0.0       # Time evacuated (egress)
+    exit_door: str = ""       # Which door used (egress)

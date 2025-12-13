@@ -250,21 +250,31 @@ class LiveSimulationFrame(ttk.Frame):
                 if max_val < 1: max_val = 1
                 cmap = cm.get_cmap('turbo')
                 for (r, c), count in self.sim.heatmap_accum.items():
+                    # Only show heatmap for aisleways, not seats
+                    cell_type = self.sim.geo.layout_map.get((r, c), '.')
+                    if cell_type != '-':
+                        continue  # Skip non-aisle cells
                     if count > 0:
                         norm = min(1.0, count / max_val)
                         rgba = cmap(norm)
                         px, py = self.get_phys_coords(r, c)
                         rect = mpatches.Rectangle((px-0.25, py-0.4), 0.5, 0.8, color=rgba, alpha=0.85, zorder=0)
                         self.ax.add_patch(rect)
+            self.canvas.draw()
             return
 
+        total_pax = len(self.sim.passengers) if self.sim.passengers else 1
+        female_cnt = sum(1 for p in self.sim.passengers if getattr(p, "is_female", False))
+        over50_cnt = sum(1 for p in self.sim.passengers if getattr(p, "is_over_50", False))
+        infants_cnt = getattr(self.sim.cfg.pax_mix, "simulated_infants", 0)
+        female_pct = (female_cnt / total_pax) * 100
+        over50_pct = (over50_cnt / total_pax) * 100
+
         legend_patches = [
-            mpatches.Patch(color='#00cccc', label='Business'),
-            mpatches.Patch(color='#007acc', label='Economy'),
-            mpatches.Patch(color='#9b59b6', label='Family'),
-            mpatches.Patch(color='#e67e22', label='Wheelchair'),
-            mpatches.Patch(color='#f1c40f', label='Stow/Wait'),
-            mpatches.Patch(color='#d9534f', label='Seated')
+            mpatches.Patch(color='#e91e63', label=f"Female: {female_cnt} ({female_pct:.0f}%)"),
+            mpatches.Patch(color='#f39c12', label=f"Over 50: {over50_cnt} ({over50_pct:.0f}%)"),
+            mpatches.Patch(color='#007acc', label="Other"),
+            mpatches.Patch(color='#666666', alpha=0.0, label=f"Infants (dolls): {infants_cnt}")
         ]
         self.ax.legend(handles=legend_patches, loc='upper left', bbox_to_anchor=(1.02, 1.0), ncol=1, fontsize=9, frameon=False)
 
@@ -303,13 +313,22 @@ class LiveSimulationFrame(ttk.Frame):
             if not is_active:
                 px, py = self.get_phys_coords(door.row, door.col)
                 self.ax.plot(px, py, 'x', color='red', markersize=15, markeredgewidth=3, zorder=20)
+            # Label doors (always show)
+            px, py = self.get_phys_coords(door.row, door.col)
+            # Place labels above for forward/mid, below for aft doors (higher row index)
+            if door.row >= self.sim.cfg.lopa.rows_total - 1:
+                self.ax.text(px, py + 0.8, door.name, fontsize=8, ha='center', va='top', color='#333333', zorder=21)
+            else:
+                self.ax.text(px, py - 0.6, door.name, fontsize=8, ha='center', va='bottom', color='#333333', zorder=21)
 
         for p in active:
-            color = '#007acc' 
-            if p.p_type == 'business': color = '#00cccc'
-            elif p.p_type == 'family': color = '#9b59b6'
-            elif p.p_type == 'prm': color = '#e67e22'
-            if p.curr_r == p.row: color = '#f1c40f' 
+            # Demographic-based coloring: prioritize over_50, then female, else other
+            if getattr(p, "is_over_50", False):
+                color = '#f39c12'
+            elif getattr(p, "is_female", False):
+                color = '#e91e63'
+            else:
+                color = '#007acc'
             px, py = self.get_phys_coords(p.curr_r, p.curr_c)
             self.ax.plot(px, py, 'o', color=color, ms=6, markeredgecolor='white', zorder=10)
 

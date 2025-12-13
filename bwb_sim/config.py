@@ -25,9 +25,10 @@ class AircraftLOPA(BaseModel):
     door_locations: List[DoorLocation]
 
 class PassengerMix(BaseModel):
-    business_pct: int = 15
-    family_pct: int = 15
-    prm_pct: int = 2
+    # FAA Appendix J Demographics
+    female_pct: int = 40      # FAA requires >= 40%
+    over_50_pct: int = 35     # FAA requires >= 35%
+    simulated_infants: int = 3  # FAA requires 3 dolls carried by passengers
 
 class Behavior(BaseModel):
     # --- BOARDING SPEEDS (Granular) ---

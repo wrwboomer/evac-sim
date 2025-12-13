@@ -17,10 +17,12 @@ class AnalyticsDashboard(ttk.Frame):
         self.controller = controller
         self.config = config
         self.is_running = False
-        self.results = []
+        self.results_times = []
+        self.results_spp = []  # seconds per pax
+        self.results_pass = []  # FAA 90s pass flags
         
         # Load from controller memory
-        self.baseline_results = baseline_data
+        self.baseline_results = baseline_data  # times in minutes (legacy)
         self.baseline_name = baseline_name
         
         self.create_widgets()
@@ -110,7 +112,9 @@ class AnalyticsDashboard(ttk.Frame):
         self.btn_view.config(state="disabled")
         self.btn_baseline.config(state="disabled")
         self.btn_clear.config(state="disabled")
-        self.results = []
+        self.results_times = []
+        self.results_spp = []
+        self.results_pass = []
         self.progress['value'] = 0
         
         trials = self.trials_var.get()
@@ -123,7 +127,10 @@ class AnalyticsDashboard(ttk.Frame):
             for i in range(trials):
                 sim = Simulation(self.config)
                 stats = sim.run(headless=True)
-                self.results.append(stats['total_time'] / 60.0) 
+                self.results_times.append(stats['total_time'])  # seconds
+                pax = max(1, stats.get('evacuated_count') or stats.get('total_pax', 0))
+                self.results_spp.append(stats['total_time'] / pax)  # sec/pax
+                self.results_pass.append(bool(stats.get('faa_pass_90s')))
                 
                 pct = ((i + 1) / trials) * 100
                 self.progress['value'] = pct
@@ -135,10 +142,10 @@ class AnalyticsDashboard(ttk.Frame):
         self.after(0, self.render_charts)
 
     def set_baseline(self):
-        if not self.results: return
+        if not self.results_times: return
         
         # Save locally
-        self.baseline_results = list(self.results)
+        self.baseline_results = list(self.results_times)
         self.baseline_name = self.config.lopa.name
         
         # Save Global
@@ -160,7 +167,7 @@ class AnalyticsDashboard(ttk.Frame):
 
     def render_charts(self):
         self.btn_run.config(state="normal")
-        if self.results:
+        if self.results_times:
             self.btn_save.config(state="normal")
             self.btn_view.config(state="normal")
             self.btn_baseline.config(state="normal")
@@ -169,12 +176,12 @@ class AnalyticsDashboard(ttk.Frame):
             self.btn_clear.config(state="normal")
 
         # Handle empty states
-        if not self.results and self.baseline_results:
+        if not self.results_times and self.baseline_results:
             current_times = np.array([])
             avg = 0
             p90 = 0
-        elif self.results:
-            current_times = np.array(self.results)
+        elif self.results_times:
+            current_times = np.array(self.results_times)
             avg = np.mean(current_times)
             p90 = np.percentile(current_times, 90)
         else:
@@ -186,16 +193,20 @@ class AnalyticsDashboard(ttk.Frame):
             return 
 
         stats_text = ""
-        if self.results:
-            stats_text = f"CURRENT: Avg: {avg:.1f}m | 90th%: {p90:.1f}m"
+        spp_avg = np.mean(self.results_spp) if self.results_spp else 0
+        pass_rate = (np.mean(self.results_pass) * 100) if self.results_pass else 0
+        if self.results_times:
+            stats_text = f"CURRENT: Avg: {avg:.1f}s | 90th%: {p90:.1f}s"
+            stats_text += f" | Avg sec/pax: {spp_avg:.1f}"
+            stats_text += f" | FAA Pass (≤90s): {pass_rate:.0f}%"
         
-        if self.baseline_results and self.results:
+        if self.baseline_results and self.results_times:
             base_avg = np.mean(self.baseline_results)
             delta = avg - base_avg
             sign = "+" if delta > 0 else ""
             stats_text += f" || vs BASELINE: {sign}{delta:.1f}m"
             
-        self.lbl_stats.config(text=stats_text, bootstyle="success" if self.results else "secondary")
+        self.lbl_stats.config(text=stats_text, bootstyle="success" if self.results_times else "secondary")
         
         # PLOT 1
         self.ax1.clear()
@@ -205,12 +216,12 @@ class AnalyticsDashboard(ttk.Frame):
             self.ax1.hist(self.baseline_results, bins=10, color='#95a5a6', alpha=0.5, label=lbl)
             self.ax1.axvline(np.mean(self.baseline_results), color='gray', linestyle='dashed', linewidth=1)
 
-        if self.results:
+        if self.results_times:
             self.ax1.hist(current_times, bins=10, color='#007acc', alpha=0.7, label='Current', edgecolor='black')
-            self.ax1.axvline(avg, color='red', linestyle='dashed', linewidth=1, label=f'Avg: {avg:.1f}m')
+            self.ax1.axvline(avg, color='red', linestyle='dashed', linewidth=1, label=f'Avg: {avg:.1f}s')
         
         self.ax1.set_title("Distribution Comparison")
-        self.ax1.set_xlabel("Time (Minutes)")
+        self.ax1.set_xlabel("Time (Seconds)")
         self.ax1.set_ylabel("Frequency")
         self.ax1.legend()
 
@@ -227,7 +238,7 @@ class AnalyticsDashboard(ttk.Frame):
             labels.append(lbl)
             colors.append('#95a5a6')
             
-        if self.results:
+        if self.results_times:
             data_to_plot.append(current_times)
             labels.append(self.config.lopa.name[:12]+"...")
             colors.append('#007acc')
@@ -238,19 +249,23 @@ class AnalyticsDashboard(ttk.Frame):
                 patch.set_facecolor(color)
             
         self.ax2.set_title("Variance Comparison")
-        self.ax2.set_ylabel("Minutes")
+        self.ax2.set_ylabel("Seconds")
         self.ax2.grid(True, axis='y', linestyle='--', alpha=0.7)
 
         self.canvas.draw()
 
     def generate_report_text(self):
-        if not self.results: return ""
+        if not self.results_times: return ""
         
-        times = np.array(self.results)
+        times = np.array(self.results_times)
         avg = np.mean(times)
         min_t = np.min(times)
         max_t = np.max(times)
         std_dev = np.std(times)
+        spp_avg = np.mean(self.results_spp) if self.results_spp else 0
+        spp_min = np.min(self.results_spp) if self.results_spp else 0
+        spp_max = np.max(self.results_spp) if self.results_spp else 0
+        pass_rate = (np.mean(self.results_pass) * 100) if self.results_pass else 0
         
         lines = []
         lines.append("==========================================")
@@ -260,14 +275,27 @@ class AnalyticsDashboard(ttk.Frame):
         lines.append("")
         lines.append(f"Layout:           {self.config.lopa.name}")
         lines.append(f"Strategy:         {self.config.strategy}")
-        lines.append(f"Doors Used:       {self.config.primary_door}")
-        lines.append(f"Total Trials:     {len(self.results)}")
+        if getattr(self.config, "mode", "egress") == "egress":
+            active = [d.name for d in self.config.lopa.door_locations if self.config.behavior.active_exits.get(d.name, d.active)]
+            blocked = [d.name for d in self.config.lopa.door_locations if not self.config.behavior.active_exits.get(d.name, d.active)]
+            lines.append(f"Active Exits:     {', '.join(active) if active else 'None'}")
+            lines.append(f"Blocked Exits:    {', '.join(blocked) if blocked else 'None'}")
+        else:
+            lines.append(f"Doors Used:       {self.config.primary_door}")
+        lines.append(f"Total Trials:     {len(self.results_times)}")
         lines.append("")
-        lines.append("--- STATISTICS (Minutes) ---")
-        lines.append(f"Average Time:     {avg:.2f} min")
-        lines.append(f"Fastest Time:     {min_t:.2f} min")
-        lines.append(f"Slowest Time:     {max_t:.2f} min")
-        lines.append(f"Std Deviation:    {std_dev:.2f} min")
+        lines.append("--- BATCH STATISTICS ---")
+        lines.append(f"Trials:           {len(self.results_times)}")
+        lines.append(f"Average Time:     {avg:.2f} sec")
+        lines.append(f"Fastest Time:     {min_t:.2f} sec")
+        lines.append(f"Slowest Time:     {max_t:.2f} sec")
+        lines.append(f"Std Deviation:    {std_dev:.2f} sec")
+        lines.append("")
+        lines.append("--- EGRESS EFFICIENCY ---")
+        lines.append(f"Avg sec/pax:      {spp_avg:.1f} sec/pax")
+        lines.append(f"Best sec/pax:     {spp_min:.1f} sec/pax")
+        lines.append(f"Worst sec/pax:    {spp_max:.1f} sec/pax")
+        lines.append(f"FAA Pass (≤90s):  {pass_rate:.0f}% of runs")
         
         if self.baseline_results:
             base_times = np.array(self.baseline_results)

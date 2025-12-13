@@ -7,6 +7,7 @@ import sys
 import glob
 import shutil
 import traceback
+import math
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
@@ -124,7 +125,7 @@ class ConfigPage(ttk.Frame):
         self.refresh_door_checkboxes() # Helper to populate
 
         # 2. Visibility
-        self.add_manual_slider(self.egress_frame, "Visibility Factor (1=Clear, 0.5=Smoke)", "visibility_factor", 0.1, 1.0, initial=1.0)
+        self.add_manual_slider(self.egress_frame, "Visibility Factor (1=Clear, 0.5=Smoke)", "visibility_factor", 0.1, 1.0, initial=1.0, label_width=40)
 
         # 3. Slide Delay
         self.add_manual_slider(self.egress_frame, "Slide Delay (sec)", "slide_delay_sec", 0.0, 15.0, initial=10.0)
@@ -133,18 +134,44 @@ class ConfigPage(ttk.Frame):
         self.add_manual_slider(self.egress_frame, "Reaction Time (Mean)", "reaction_time_mean", 0.0, 10.0, initial=2.0)
         self.add_manual_slider(self.egress_frame, "Panic Level (0-1)", "panic_level", 0.0, 1.0, initial=0.5)
 
-        # --- SECTION 5: MIX ---
-        demo_frame = ttk.Labelframe(self, text="Passenger Mix (%)", padding=10, bootstyle="warning")
+        # --- SECTION 5: FAA PASSENGER DEMOGRAPHICS ---
+        demo_frame = ttk.Labelframe(self, text="FAA Appendix J Demographics", padding=10, bootstyle="warning")
         demo_frame.pack(fill=X, pady=5)
-        self.add_manual_slider(demo_frame, "Business %", "business_pct", 0, 100, is_mix=True)
-        self.add_manual_slider(demo_frame, "Families %", "family_pct", 0, 100, is_mix=True)
-        self.add_manual_slider(demo_frame, "PRM %", "prm_pct", 0, 20, is_mix=True)
+        
+        # Female % slider with requirement indicator
+        self.add_faa_slider(demo_frame, "Female %", "female_pct", 0, 100, 
+                           requirement=40, req_text="FAA requires ≥40%")
+        
+        # Over 50 % slider with requirement indicator
+        self.add_faa_slider(demo_frame, "Over 50 Years %", "over_50_pct", 0, 100, 
+                           requirement=35, req_text="FAA requires ≥35%")
+        
+        # Female AND Over 50 calculated indicator
+        self.overlap_frame = ttk.Frame(demo_frame)
+        self.overlap_frame.pack(fill=X, pady=5)
+        self.overlap_lbl = ttk.Label(self.overlap_frame, text="Female + Over 50 Overlap: 15%", width=35)
+        self.overlap_lbl.pack(side=LEFT)
+        self.overlap_status = ttk.Label(self.overlap_frame, text="✓ PASS (≥15%)", foreground="green", font=("Helvetica", 9, "bold"))
+        self.overlap_status.pack(side=RIGHT)
+        
+        # Simulated Infants
+        infant_row = ttk.Frame(demo_frame)
+        infant_row.pack(fill=X, pady=2)
+        self.var_simulated_infants = tk.IntVar(value=3)
+        ttk.Label(infant_row, text="Simulated Infants (dolls): ", width=25).pack(side=LEFT)
+        ttk.Spinbox(infant_row, from_=0, to=10, textvariable=self.var_simulated_infants, width=5).pack(side=LEFT)
+        ttk.Label(infant_row, text="  FAA requires 3", foreground="gray").pack(side=LEFT)
         
         # --- SECTION 6: PHYSICS ---
         beh_frame = ttk.Labelframe(self, text="Physics", padding=10, bootstyle="secondary")
         beh_frame.pack(fill=X, pady=5)
-        self.add_manual_slider(beh_frame, "Walk/Run Speed", "speed_mps_mean", 0.5, 2.0)
-        self.add_manual_slider(beh_frame, "Stow/Reaction Time", "stow_time_mean", 2.0, 30.0)
+        # Per-type speeds
+        # Wider labels to ensure full text is visible
+        label_w = 32
+        self.add_manual_slider(beh_frame, "Speed - Business (m/s)", "speed_business", 0.5, 2.5, initial=self.base_config.behavior.speed_business, label_width=label_w)
+        self.add_manual_slider(beh_frame, "Speed - Economy (m/s)", "speed_economy", 0.3, 2.5, initial=self.base_config.behavior.speed_economy, label_width=label_w)
+        self.add_manual_slider(beh_frame, "Speed - Family (m/s)", "speed_family", 0.3, 2.5, initial=self.base_config.behavior.speed_family, label_width=label_w)
+        self.add_manual_slider(beh_frame, "Speed - Wheelchair/PRM (m/s)", "speed_prm", 0.1, 2.0, initial=self.base_config.behavior.speed_prm, label_width=label_w)
         
         lf_frame = ttk.Labelframe(self, text="Occupancy", padding=10)
         lf_frame.pack(fill=X, pady=5)
@@ -195,7 +222,7 @@ class ConfigPage(ttk.Frame):
         ttk.Label(parent, text=label).pack(anchor=W)
         ttk.Combobox(parent, textvariable=var, values=opts, state="readonly").pack(fill=X)
 
-    def add_manual_slider(self, parent, label, key, min_v, max_v, is_mix=False, is_percentage=False, initial=None):
+    def add_manual_slider(self, parent, label, key, min_v, max_v, is_mix=False, is_percentage=False, initial=None, label_width=25):
         if initial is None:
             if is_mix: initial = getattr(self.base_config.pax_mix, key)
             elif is_percentage: initial = self.base_config.load_factor * 100
@@ -204,10 +231,67 @@ class ConfigPage(ttk.Frame):
         setattr(self, f"var_{key}", var)
         row = ttk.Frame(parent)
         row.pack(fill=X)
-        lbl = ttk.Label(row, text=f"{label}: {initial:.1f}", width=25)
+        lbl = ttk.Label(row, text=f"{label}: {initial:.1f}", width=label_width)
         lbl.pack(side=LEFT)
         def update(v): lbl.config(text=f"{label}: {float(v):.1f}")
         ttk.Scale(row, from_=min_v, to=max_v, variable=var, command=update).pack(side=RIGHT, fill=X, expand=True)
+
+    def add_faa_slider(self, parent, label, key, min_v, max_v, requirement, req_text):
+        """Add slider with FAA pass/fail indicator."""
+        initial = getattr(self.base_config.pax_mix, key)
+        var = tk.DoubleVar(value=initial)
+        setattr(self, f"var_{key}", var)
+        
+        row = ttk.Frame(parent)
+        row.pack(fill=X, pady=2)
+        
+        lbl = ttk.Label(row, text=f"{label}: {initial:.0f}%", width=20)
+        lbl.pack(side=LEFT)
+        
+        status_lbl = ttk.Label(row, text="✓ PASS" if initial >= requirement else "✗ FAIL", 
+                               foreground="green" if initial >= requirement else "red",
+                               font=("Helvetica", 9, "bold"), width=8)
+        status_lbl.pack(side=RIGHT)
+        
+        req_lbl = ttk.Label(row, text=req_text, foreground="gray", font=("Helvetica", 8))
+        req_lbl.pack(side=RIGHT, padx=5)
+        
+        def update(v):
+            val = float(v)
+            lbl.config(text=f"{label}: {val:.0f}%")
+            if val >= requirement:
+                status_lbl.config(text="✓ PASS", foreground="green")
+            else:
+                status_lbl.config(text="✗ FAIL", foreground="red")
+            self.update_overlap_indicator()
+        
+        scale = ttk.Scale(row, from_=min_v, to=max_v, variable=var, command=update)
+        scale.pack(side=LEFT, fill=X, expand=True, padx=5)
+
+    def update_overlap_indicator(self):
+        """Calculate and display Female + Over 50 overlap based on statistical overlap."""
+        female_pct = getattr(self, "var_female_pct", tk.DoubleVar(value=40)).get()
+        over_50_pct = getattr(self, "var_over_50_pct", tk.DoubleVar(value=35)).get()
+        
+        # Statistical overlap: P(A and B) ≈ P(A) * P(B) for independent events
+        # But FAA requires at least 15% of passengers to be BOTH female AND over 50
+        # Conservative estimate: minimum of the two percentages, capped by the smaller group
+        overlap = min(female_pct, over_50_pct) * min(female_pct, over_50_pct) / 100
+        # A simpler model: assume 50% of over-50s are female (realistic demographic)
+        overlap = min(female_pct, over_50_pct * 0.5 + female_pct * 0.5 * over_50_pct / 100)
+        overlap = min(female_pct, over_50_pct)  # Simplified: overlap can't exceed either percentage
+        
+        # For FAA compliance, we show the expected overlap percentage
+        # Overlap = (female% / 100) * over_50% represents females who are also over 50
+        overlap = (female_pct / 100) * over_50_pct
+        
+        if hasattr(self, 'overlap_lbl'):
+            self.overlap_lbl.config(text=f"Female + Over 50 Overlap: {overlap:.1f}%")
+        if hasattr(self, 'overlap_status'):
+            if overlap >= 15:
+                self.overlap_status.config(text="✓ PASS (≥15%)", foreground="green")
+            else:
+                self.overlap_status.config(text="✗ FAIL (≥15%)", foreground="red")
 
     def get_current_config(self):
         cfg = self.base_config 
@@ -228,22 +312,38 @@ class ConfigPage(ttk.Frame):
         cfg.strategy = "realistic_random"
         cfg.primary_door = "L2"
         
-        cfg.behavior.speed_mps_mean = getattr(self, "var_speed_mps_mean").get()
-        # Connect UI slider to evacuation speed as well
-        cfg.behavior.evac_speed_mean = getattr(self, "var_speed_mps_mean").get()
+        # Per-type speeds from UI
+        cfg.behavior.speed_business = getattr(self, "var_speed_business").get()
+        cfg.behavior.speed_economy = getattr(self, "var_speed_economy").get()
+        cfg.behavior.speed_family = getattr(self, "var_speed_family").get()
+        cfg.behavior.speed_prm = getattr(self, "var_speed_prm").get()
         if hasattr(self, "var_stow_time_mean"):
              cfg.behavior.stow_time_mean = getattr(self, "var_stow_time_mean").get()
 
         cfg.behavior.seat_shuffle_sec = getattr(self, "var_seat_shuffle_sec", tk.DoubleVar(value=20.0)).get()
         
-        cfg.pax_mix.business_pct = int(getattr(self, "var_business_pct").get())
-        cfg.pax_mix.family_pct = int(getattr(self, "var_family_pct").get())
-        cfg.pax_mix.prm_pct = int(getattr(self, "var_prm_pct").get())
+        # FAA Appendix J Demographics
+        cfg.pax_mix.female_pct = int(getattr(self, "var_female_pct").get())
+        cfg.pax_mix.over_50_pct = int(getattr(self, "var_over_50_pct").get())
+        cfg.pax_mix.simulated_infants = int(getattr(self, "var_simulated_infants").get())
         cfg.load_factor = getattr(self, "var_load_factor").get() / 100.0
         return cfg
 
     def on_run(self):
-        self.controller.start_simulation(self.get_current_config())
+        cfg = self.get_current_config()
+        self.notify_exit_requirement(cfg)
+        self.controller.start_simulation(cfg)
+
+    def notify_exit_requirement(self, cfg):
+        """Notify user if door blocking meets FAA 50% exit availability."""
+        total = len(cfg.lopa.door_locations)
+        active = sum(1 for d in cfg.lopa.door_locations if cfg.behavior.active_exits.get(d.name, d.active))
+        blocked = total - active
+        # FAA BWB test: 3 or more doors must be blocked
+        if blocked >= 3:
+            tk.messagebox.showinfo("Exit Availability", f"PASS: {blocked}/{total} exits blocked (FAA BWB test requires ≥3 blocked)")
+        else:
+            tk.messagebox.showwarning("Exit Availability", f"FAIL: {blocked}/{total} exits blocked (need ≥3 blocked for FAA BWB test)")
 
 if __name__ == "__main__":
     app = BWBApp()

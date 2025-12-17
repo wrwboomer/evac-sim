@@ -146,7 +146,7 @@ class Simulation:
         
         pax_list = []
         
-        def make_pax(s_data, ptype, grp_id):
+        def make_pax(s_data, ptype, grp_id, speed_override=None):
             p = Passenger(id=s_data['id'], row=s_data['r'], col=s_data['c'])
             p.aisle_col = s_data['aisle']
             p.p_type = ptype
@@ -166,8 +166,11 @@ class Simulation:
                 base = self.cfg.behavior.speed_economy
                 p.stow_time = self.cfg.behavior.stow_time_mean
             
-            p.speed = random.gauss(base, 0.1)
-            p.speed = max(0.2, p.speed)
+            if speed_override:
+                p.speed = speed_override
+            else:
+                p.speed = random.gauss(base, 0.1)
+                p.speed = max(0.2, p.speed)
             return p
 
         random.shuffle(seats)
@@ -183,9 +186,13 @@ class Simulation:
             pax_list.append(make_pax(seats[seat_idx], "economy", seat_idx)); seat_idx += 1
         while seat_idx < total:
             fam_id = seat_idx
+            # Cohesion: Generate shared speed for the entire family group
+            base_fam = self.cfg.behavior.speed_family
+            fam_speed = max(0.2, random.gauss(base_fam, 0.1))
+            
             for i in range(4):
                 if seat_idx >= total: break
-                pax_list.append(make_pax(seats[seat_idx], "family", fam_id)); seat_idx += 1
+                pax_list.append(make_pax(seats[seat_idx], "family", fam_id, speed_override=fam_speed)); seat_idx += 1
 
         if self.cfg.load_factor < 1.0:
             count = int(len(pax_list) * self.cfg.load_factor)
@@ -240,9 +247,20 @@ class Simulation:
             
         # Remainder: Male and Under 50 (Implicitly False/False)
 
+        # Assign Infants (carried by passengers)
+        # We select random adults (avoiding PRM if possible) to carry the infants
+        valid_carriers = [p for p in pax_list if p.p_type != "prm"]
+        n_infants = self.cfg.pax_mix.simulated_infants
+        if len(valid_carriers) >= n_infants:
+            carriers = random.sample(valid_carriers, n_infants)
+            for c in carriers:
+                c.has_infant = True
+                # Carrying an infant reduces speed significantly
+                c.speed = max(0.2, c.speed * 0.7)
+
         for p in pax_list:
-            # Over 50: slower
-            if getattr(p, "is_over_50", False):
+            # Over 50: slower (but don't double-penalize PRMs who are already slow)
+            if getattr(p, "is_over_50", False) and p.p_type != "prm":
                 p.speed = max(0.2, p.speed * 0.8)
             # Female: keep as-is (could tweak if needed)
             # PRM already handled via p_type

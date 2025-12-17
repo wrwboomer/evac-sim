@@ -33,3 +33,6 @@ class Passenger:
     t_seated: float = 0.0
     t_exit: float = 0.0       # Time evacuated (egress)
     exit_door: str = ""       # Which door used (egress)
+    
+    # Special
+    has_infant: bool = False

@@ -87,8 +87,30 @@ class BWBApp(ttk.Window):
 
 class ConfigPage(ttk.Frame):
     def __init__(self, parent, controller):
-        super().__init__(parent, padding=30)
+        super().__init__(parent)
         self.controller = controller
+        
+        # --- SCROLLABLE CONTAINER ---
+        self.canvas = tk.Canvas(self, borderwidth=0, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient=VERTICAL, command=self.canvas.yview)
+        self.scroll_frame = ttk.Frame(self.canvas, padding=30)
+        
+        self.scroll_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+        
+        self.canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        self.scrollbar.pack(side=RIGHT, fill=Y)
+        
+        # Enable Mousewheel
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        
         base_path = os.path.dirname(os.path.abspath(__file__))
         self.layouts_dir = os.path.join(base_path, "layouts")
         
@@ -99,12 +121,16 @@ class ConfigPage(ttk.Frame):
         self.base_config = SimConfig.from_json(self.current_lopa_path)
         self.create_widgets()
 
+    def _on_mousewheel(self, event):
+        if self.canvas.winfo_exists():
+            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
     def create_widgets(self):
         # HEADER
-        ttk.Label(self, text="SIMULATION CONFIGURATION", font="-size 14 -weight bold").pack(pady=10)
+        ttk.Label(self.scroll_frame, text="SIMULATION CONFIGURATION", font="-size 14 -weight bold").pack(pady=10)
         
         # --- SECTION 2: LAYOUT ---
-        self.lopa_frame = ttk.Labelframe(self, text="Aircraft Layout", padding=10, bootstyle="success")
+        self.lopa_frame = ttk.Labelframe(self.scroll_frame, text="Aircraft Layout", padding=10, bootstyle="success")
         self.lopa_frame.pack(fill=X, pady=5)
         lopa_names = [os.path.basename(f) for f in self.available_loplas]
         self.lopa_var = tk.StringVar(value=lopa_names[0])
@@ -113,12 +139,13 @@ class ConfigPage(ttk.Frame):
         cb.bind("<<ComboboxSelected>>", self.reload_config)
 
         # --- SECTION 2B: EGRESS PARAMETERS (ALWAYS VISIBLE) ---
-        self.egress_frame = ttk.Labelframe(self, text="Emergency Egress Parameters", padding=10, bootstyle="danger")
+        self.egress_frame = ttk.Labelframe(self.scroll_frame, text="Emergency Egress Parameters", padding=10, bootstyle="danger")
         self.egress_frame.pack(fill=X, pady=5)
         
         # 1. Door Blocking (50% Rule)
         lbl = ttk.Label(self.egress_frame, text="Active Exits (Uncheck to Block):")
         lbl.pack(anchor=W)
+        ttk.Label(self.egress_frame, text="(Note: Type A doors are Dual Flow)", font=("Helvetica", 8, "italic"), bootstyle="secondary").pack(anchor=W, padx=5)
         self.door_chk_frame = ttk.Frame(self.egress_frame)
         self.door_chk_frame.pack(fill=X, pady=5)
         self.door_vars = {} # {name: BooleanVar}
@@ -127,15 +154,19 @@ class ConfigPage(ttk.Frame):
         # 2. Visibility
         self.add_manual_slider(self.egress_frame, "Visibility Factor (1=Clear, 0.5=Smoke)", "visibility_factor", 0.1, 1.0, initial=1.0, label_width=40)
 
-        # 3. Slide Delay
-        self.add_manual_slider(self.egress_frame, "Slide Delay (sec)", "slide_delay_sec", 0.0, 15.0, initial=10.0)
+        # 3. Door & Slide Delays
+        self.add_manual_slider(self.egress_frame, "Door Ready Time (sec)", "exit_ready_time_sec", 0.0, 30.0, initial=10.0)
+        self.add_manual_slider(self.egress_frame, "Slide Deploy Time (sec)", "slide_deploy_time_sec", 0.0, 15.0, initial=3.0)
         
         # 4. Reaction & Panic (Moved/Copied)
         self.add_manual_slider(self.egress_frame, "Reaction Time (Mean)", "reaction_time_mean", 0.0, 10.0, initial=2.0)
         self.add_manual_slider(self.egress_frame, "Panic Level (0-1)", "panic_level", 0.0, 1.0, initial=0.5)
 
+        # 5. Cross Aisle Width
+        self.add_manual_slider(self.egress_frame, "Cross-Aisle Width (1=Single, 2=Double)", "cross_aisle_width", 1.0, 2.0, initial=2.0, label_width=40)
+
         # --- SECTION 5: FAA PASSENGER DEMOGRAPHICS ---
-        demo_frame = ttk.Labelframe(self, text="FAA Appendix J Demographics", padding=10, bootstyle="warning")
+        demo_frame = ttk.Labelframe(self.scroll_frame, text="FAA Appendix J Demographics", padding=10, bootstyle="warning")
         demo_frame.pack(fill=X, pady=5)
         
         # Female % slider with requirement indicator
@@ -165,7 +196,7 @@ class ConfigPage(ttk.Frame):
         
         
         # --- SECTION 5B: PASSENGER MIX ---
-        mix_frame = ttk.Labelframe(self, text="Passenger Mix (%)", padding=10, bootstyle="info")
+        mix_frame = ttk.Labelframe(self.scroll_frame, text="Passenger Mix (%)", padding=10, bootstyle="info")
         mix_frame.pack(fill=X, pady=5)
         
         self.add_manual_slider(mix_frame, "Business %", "business_pct", 0, 100, is_mix=True)
@@ -173,7 +204,7 @@ class ConfigPage(ttk.Frame):
         self.add_manual_slider(mix_frame, "PRM %", "prm_pct", 0, 100, is_mix=True)
 
         # --- SECTION 6: PHYSICS ---
-        beh_frame = ttk.Labelframe(self, text="Physics", padding=10, bootstyle="secondary")
+        beh_frame = ttk.Labelframe(self.scroll_frame, text="Physics", padding=10, bootstyle="secondary")
         beh_frame.pack(fill=X, pady=5)
         # Per-type speeds
         # Wider labels to ensure full text is visible
@@ -183,15 +214,21 @@ class ConfigPage(ttk.Frame):
         self.add_manual_slider(beh_frame, "Speed - Family (m/s)", "speed_family", 0.3, 2.5, initial=self.base_config.behavior.speed_family, label_width=label_w)
         self.add_manual_slider(beh_frame, "Speed - Wheelchair/PRM (m/s)", "speed_prm", 0.1, 2.0, initial=self.base_config.behavior.speed_prm, label_width=label_w)
         
-        lf_frame = ttk.Labelframe(self, text="Occupancy", padding=10)
+        lf_frame = ttk.Labelframe(self.scroll_frame, text="Occupancy", padding=10)
         lf_frame.pack(fill=X, pady=5)
         self.add_manual_slider(lf_frame, "Load Factor (%)", "load_factor", 50, 100, is_percentage=True)
         
-        # --- FOOTER ---
-        btn_frame = ttk.Frame(self)
+        # --- FOOTER (Fixed at the bottom of the scroll frame content) ---
+        btn_frame = ttk.Frame(self.scroll_frame) # Inside scroll frame
         btn_frame.pack(fill=X, pady=20)
-        ttk.Button(btn_frame, text="EXIT APP", command=self.quit_app, bootstyle="danger-outline").pack(side=LEFT, ipadx=10)
-        ttk.Button(btn_frame, text="START EVACUATION SIMULATION", command=self.on_run, bootstyle="danger").pack(side=RIGHT, fill=X, expand=True, padx=10)
+        
+        # Standard Sizing (matches Live Viz page)
+        # Using fill=X, expand=True for equal width spacing
+        b_exit = ttk.Button(btn_frame, text="EXIT APP", command=self.quit_app, bootstyle="danger")
+        b_exit.pack(side=LEFT, fill=X, expand=True, padx=5, ipady=5)
+        
+        b_run = ttk.Button(btn_frame, text="START SIMULATION", command=self.on_run, bootstyle="success")
+        b_run.pack(side=LEFT, fill=X, expand=True, padx=5, ipady=5)
 
     def quit_app(self):
         self.controller.destroy()
@@ -300,9 +337,12 @@ class ConfigPage(ttk.Frame):
 
         # Egress Values
         cfg.behavior.visibility_factor = getattr(self, "var_visibility_factor").get()
-        cfg.behavior.slide_delay_sec = getattr(self, "var_slide_delay_sec").get()
+        cfg.behavior.exit_ready_time_sec = getattr(self, "var_exit_ready_time_sec").get()
+        cfg.behavior.slide_deploy_time_sec = getattr(self, "var_slide_deploy_time_sec").get()
+        cfg.behavior.reaction_time_mean = getattr(self, "var_reaction_time_mean").get()
         cfg.behavior.reaction_time_mean = getattr(self, "var_reaction_time_mean").get()
         cfg.behavior.panic_level = getattr(self, "var_panic_level").get()
+        cfg.behavior.cross_aisle_width = getattr(self, "var_cross_aisle_width").get()
              
         # Populate active_exits dict
         for name, var in self.door_vars.items():

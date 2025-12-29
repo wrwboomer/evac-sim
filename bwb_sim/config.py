@@ -56,9 +56,13 @@ class Behavior(BaseModel):
     
     # --- EGRESS: CERTIFICATION VARS ---
     visibility_factor: float = 1.0     # 1.0=Clear, 0.5=Smoke
-    slide_delay_sec: float = 10.0      # Inflation time
+    visibility_factor: float = 1.0     # 1.0=Clear, 0.5=Smoke
+    exit_ready_time_sec: float = 10.0  # Time to open door
+    slide_deploy_time_sec: float = 3.0 # Time for slide to inflate
+    active_exits: Dict[str, bool] = {} # Override LOPA Active stats
     active_exits: Dict[str, bool] = {} # Override LOPA Active stats
     door_flow_rates: Dict[str, float] = {} # Specific rates per door (sec/pax)
+    cross_aisle_width: float = 2.0 # 1.0 = Single, 2.0 = Double
 
     # --- FLOW RATES (Defaults) ---
     flow_rate_type_a: float = 0.6

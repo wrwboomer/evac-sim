@@ -6,6 +6,7 @@ class Geometry:
     def __init__(self, env: simpy.Environment, config: SimConfig):
         self.env = env
         self.cfg = config.lopa
+        self.sim_config = config # Store full config (for behavior)
         # Track mode to tune capacities (boarding vs egress)
         self.mode = getattr(config, "mode", "egress")
         self.grid_resources = {} 
@@ -35,7 +36,8 @@ class Geometry:
                         cap = base_cap
                         # WIDE AISLE (Any row with a door)
                         if r in self.door_rows: 
-                            cap = max(cap, 4) 
+                            width_multiplier = getattr(self.sim_config.behavior, 'cross_aisle_width', 2.0)
+                            cap = int(base_cap * width_multiplier)
                         
                         self.grid_resources[(r, c)] = simpy.Resource(self.env, capacity=cap)
                     
@@ -66,7 +68,10 @@ class Geometry:
         # Allow dynamic creation only if it's a "Wide" row (Door row)
         is_wide_row = r in self.door_rows if hasattr(self, 'door_rows') else False
         if is_wide_row:
-            res = simpy.Resource(self.env, capacity=4)
+            # Matches _build_grid logic: Double width = double base capacity
+            base_cap = 3 if self.mode == "egress" else 2
+            width_multiplier = getattr(self.sim_config.behavior, 'cross_aisle_width', 2.0)
+            res = simpy.Resource(self.env, capacity=int(base_cap * width_multiplier))
             self.grid_resources[(r, c)] = res
             return res
 

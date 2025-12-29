@@ -100,7 +100,7 @@ class LiveSimulationFrame(ttk.Frame):
         btn_row.pack(side=BOTTOM, fill=X)
         self.btn_stop = ttk.Button(btn_row, text="PAUSE", command=self.toggle_pause, bootstyle="warning")
         self.btn_stop.pack(side=LEFT, padx=5, fill=X, expand=True)
-        self.btn_heat = ttk.Button(btn_row, text="HEATMAP", command=self.toggle_heatmap, bootstyle="info-outline")
+        self.btn_heat = ttk.Button(btn_row, text="HEATMAP", command=self.toggle_heatmap, bootstyle="primary")
         self.btn_heat.pack(side=LEFT, padx=5, fill=X, expand=True)
         btn_report = ttk.Button(btn_row, text="REPORT", command=self.show_report_dialog, bootstyle="info")
         btn_report.pack(side=LEFT, padx=5, fill=X, expand=True)
@@ -142,9 +142,9 @@ class LiveSimulationFrame(ttk.Frame):
     def toggle_heatmap(self):
         self.show_heatmap = not self.show_heatmap
         if self.show_heatmap:
-            self.btn_heat.config(bootstyle="info", text="HIDE MAP")
+            self.btn_heat.config(bootstyle="primary-outline", text="HIDE MAP")
         else:
-            self.btn_heat.config(bootstyle="info-outline", text="HEATMAP")
+            self.btn_heat.config(bootstyle="primary", text="HEATMAP")
         if not self.is_running: self.draw_frame()
 
     def return_to_config(self):

@@ -220,6 +220,8 @@ class AnalyticsDashboard(ttk.Frame):
         if self.results_times:
             self.ax1.hist(current_times, bins=10, color='#007acc', alpha=0.7, label='Current', edgecolor='black')
             self.ax1.axvline(avg, color='red', linestyle='dashed', linewidth=1, label=f'Avg: {avg:.1f}s')
+            p95 = np.percentile(current_times, 95)
+            self.ax1.axvline(p95, color='orange', linestyle='dotted', linewidth=1.5, label=f'95%: {p95:.1f}s')
         
         self.ax1.set_title("Distribution Comparison")
         self.ax1.set_xlabel("Time (Seconds)")
@@ -286,6 +288,7 @@ class AnalyticsDashboard(ttk.Frame):
         lines.append(f"Average Time:     {avg:.2f} sec")
         lines.append(f"Fastest Time:     {min_t:.2f} sec")
         lines.append(f"Slowest Time:     {max_t:.2f} sec")
+        lines.append(f"95th Percentile:  {np.percentile(times, 95):.2f} sec")
         lines.append(f"Std Deviation:    {std_dev:.2f} sec")
         lines.append("")
         lines.append("--- EGRESS EFFICIENCY ---")

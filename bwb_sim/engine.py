@@ -89,9 +89,11 @@ class Simulation:
             active_doors = self.cfg.lopa.door_locations
 
         print("Computing Pathfinding Maps...")
-        # Initialize door resources (capacity=1) for FIFO exit flow
+        # Initialize door resources
         for d in active_doors:
-            self.door_resources[d.name] = simpy.Resource(self.env, capacity=1)
+            # Type A doors are dual flow (capacity=2), others are single flow (capacity=1)
+            cap = 2 if getattr(d, 'exit_type', '') == "Type A" else 1
+            self.door_resources[d.name] = simpy.Resource(self.env, capacity=cap)
             # Door node is target
             self.door_maps[d.name] = self.geo.compute_distance_map([(d.row, d.col)])
 
@@ -555,7 +557,10 @@ class Simulation:
                  base_delay = self.cfg.behavior.door_flow_rates[target_door.name]
             
             # SLIDE DELAY: Cannot exit if slides aren't ready
-            slide_ready_time = getattr(self.cfg.behavior, 'slide_delay_sec', 0.0)
+            # Total Delay = Door Opening Time + Slide Inflation Time
+            ready_time = getattr(self.cfg.behavior, 'exit_ready_time_sec', 10.0)
+            deploy_time = getattr(self.cfg.behavior, 'slide_deploy_time_sec', 3.0)
+            slide_ready_time = ready_time + deploy_time
             time_until_ready = max(0, slide_ready_time - self.env.now)
             if time_until_ready > 0:
                  yield self.env.timeout(time_until_ready)

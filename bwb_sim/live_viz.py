@@ -279,7 +279,7 @@ class LiveSimulationFrame(ttk.Frame):
             mpatches.Patch(color='#e91e63', label=f"Female < 50: {self.get_demo_count('female')}"),
             mpatches.Patch(color='#f39c12', label=f"Male > 50:   {self.get_demo_count('over50')}"),
             mpatches.Patch(color='#007acc', label="Male < 50"),
-            mpatches.Patch(color='#666666', alpha=0.0, label=f"Infants: {infants_cnt}")
+            mpatches.Patch(color='#32CD32', label=f"Infants: {infants_cnt}") # Lime Green for Infants
         ]
         self.ax.legend(handles=legend_patches, loc='upper left', bbox_to_anchor=(1.02, 1.0), ncol=1, fontsize=9, frameon=False)
 
@@ -330,8 +330,11 @@ class LiveSimulationFrame(ttk.Frame):
             # Demographic-based coloring
             is_fem = getattr(p, "is_female", False)
             is_o50 = getattr(p, "is_over_50", False)
+            has_infant = getattr(p, "has_infant", False)
             
-            if is_fem and is_o50:
+            if has_infant:
+                color = '#32CD32' # Lime Green (Infant Carrier)
+            elif is_fem and is_o50:
                 color = '#9c27b0' # Purple (Overlap)
             elif is_o50:
                 color = '#f39c12' # Orange
